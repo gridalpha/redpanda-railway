@@ -83,8 +83,8 @@ at the broker with the superuser's credentials. `SERVER_LISTENPORT` must match
 | Path | Reaches | Auth |
 |---|---|---|
 | `/` | Redpanda Console | HTTP basic, at the gateway |
-| `/schema-registry/*` | Schema Registry (8081) | the broker's own `http_basic`, against a SASL user |
-| `/http-proxy/*` | Kafka HTTP Proxy (8082) | the broker's own `http_basic`, against a SASL user |
+| `/rp/schema-registry/*` | Schema Registry (8081) | the broker's own `http_basic`, against a SASL user |
+| `/rp/http-proxy/*` | Kafka HTTP Proxy (8082) | the broker's own `http_basic`, against a SASL user |
 | `/healthz` | the gateway itself | none |
 
 The Kafka API is reached over a Railway TCP proxy and always requires SASL/SCRAM.

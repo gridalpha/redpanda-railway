@@ -29,13 +29,15 @@
 	# Schema Registry and the Kafka HTTP Proxy authenticate every request
 	# themselves (authentication_method: http_basic against the broker's SASL
 	# users), so they are passed through rather than double-gated here.
-	redir /schema-registry /schema-registry/ 308
-	handle_path /schema-registry/* {
+	# Namespaced under /rp/ because Console owns /schema-registry, /connect and
+	# most other top-level paths as SPA routes of its own.
+	redir /rp/schema-registry /rp/schema-registry/ 308
+	handle_path /rp/schema-registry/* {
 		reverse_proxy {$REDPANDA_UPSTREAM:redpanda.railway.internal}:{$REDPANDA_SCHEMA_REGISTRY_PORT:8081}
 	}
 
-	redir /http-proxy /http-proxy/ 308
-	handle_path /http-proxy/* {
+	redir /rp/http-proxy /rp/http-proxy/ 308
+	handle_path /rp/http-proxy/* {
 		reverse_proxy {$REDPANDA_UPSTREAM:redpanda.railway.internal}:{$REDPANDA_HTTP_PROXY_PORT:8082}
 	}
 
