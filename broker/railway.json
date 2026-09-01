@@ -1,0 +1,9 @@
+{
+  "$schema": "https://railway.com/railway.schema.json",
+  "deploy": {
+    "healthcheckPath": "/v1/status/ready",
+    "healthcheckTimeout": 300,
+    "restartPolicyType": "ALWAYS",
+    "numReplicas": 1
+  }
+}

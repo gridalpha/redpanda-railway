@@ -1,0 +1,50 @@
+{
+	admin off
+	auto_https off
+	servers {
+		# Railway's edge reaches containers from CGNAT and rewrites X-Forwarded-For
+		# itself; the public range is what {client_ip} needs, since Caddy walks the
+		# header right to left.
+		trusted_proxies static 100.64.0.0/10 fd00::/8 152.233.0.0/17
+	}
+}
+
+:{$PORT:8080} {
+	log
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "no-referrer"
+		-Server
+	}
+
+	# Must come first: `handle` blocks are evaluated in the order written, and this
+	# one has to answer before the catch-all asks for credentials.
+	handle /healthz {
+		respond "ok" 200
+	}
+
+	# Schema Registry and the Kafka HTTP Proxy authenticate every request
+	# themselves (authentication_method: http_basic against the broker's SASL
+	# users), so they are passed through rather than double-gated here.
+	redir /schema-registry /schema-registry/ 308
+	handle_path /schema-registry/* {
+		reverse_proxy {$REDPANDA_UPSTREAM:redpanda.railway.internal}:{$REDPANDA_SCHEMA_REGISTRY_PORT:8081}
+	}
+
+	redir /http-proxy /http-proxy/ 308
+	handle_path /http-proxy/* {
+		reverse_proxy {$REDPANDA_UPSTREAM:redpanda.railway.internal}:{$REDPANDA_HTTP_PROXY_PORT:8082}
+	}
+
+	# Redpanda Console ships no authentication outside its enterprise build, so it
+	# never gets a public domain of its own — this is the only way in.
+	handle {
+		basic_auth {
+			{$GATEWAY_USER:admin} "{$GATEWAY_PASSWORD_HASH}"
+		}
+		reverse_proxy {$CONSOLE_UPSTREAM:console.railway.internal}:{$CONSOLE_PORT:8080}
+	}
+}
