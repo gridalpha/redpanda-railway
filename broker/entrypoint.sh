@@ -146,8 +146,10 @@ mkdir -p "$DATA_DIR" "$CONFIG_DIR"
   echo "      port: ${KAFKA_PORT}"
   echo "      authentication_method: sasl"
   if [ -n "$EXT_LISTENER" ]; then
+    # Railway's TCP proxy dials the container over IPv4; a "::" bind here is
+    # reachable from a private peer and never from the proxy.
     echo "    - name: external"
-    echo "      address: \"::\""
+    echo "      address: 0.0.0.0"
     echo "      port: ${EXT_LISTENER}"
     echo "      authentication_method: sasl"
   fi
