@@ -9,14 +9,14 @@ set -eu
 
 log() { printf '[railway-entrypoint] %s\n' "$*"; }
 
-BROKER_HOST="${REDPANDA_BROKER_HOST:-}"
+BROKER_HOST="${RP_BROKER_HOST:-}"
 case "$BROKER_HOST" in
   "" | :*) BROKER_HOST="redpanda.railway.internal" ;;
 esac
 
-KAFKA_PORT="${REDPANDA_KAFKA_PORT:-9092}"
-SCHEMA_REGISTRY_PORT="${REDPANDA_SCHEMA_REGISTRY_PORT:-8081}"
-ADMIN_PORT="${REDPANDA_ADMIN_PORT:-9644}"
+KAFKA_PORT="${RP_KAFKA_PORT:-9092}"
+SCHEMA_REGISTRY_PORT="${RP_SCHEMA_REGISTRY_PORT:-8081}"
+ADMIN_PORT="${RP_ADMIN_PORT:-9644}"
 
 # Repair on shape: a value that is empty, or starts with ':' because the host
 # half of "${host}:${port}" rendered empty, gets the deterministic literal.
