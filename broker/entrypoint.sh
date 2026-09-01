@@ -125,6 +125,21 @@ log "cgroup: cpu=${CPU_QUOTA} mem=${MEM_LIMIT_MB}MB -> --smp=${SMP} --memory=${M
 # ------------------------------------------------------------------ node config
 mkdir -p "$DATA_DIR" "$CONFIG_DIR"
 
+# Redpanda's own default for storage_min_free_bytes is 5 GiB, which is larger than
+# a stock 5 GB Railway volume: the node reports high_disk_usage from its first boot
+# and answers every produce with kafka_storage_error (the full-disk response) while
+# the deployment stays green. Derive it from the mount instead.
+DISK_TOTAL_BYTES=$(df -B1 --output=size "$MOUNT" 2>/dev/null | tail -1 | tr -dc '0-9')
+[ -n "$DISK_TOTAL_BYTES" ] || DISK_TOTAL_BYTES=0
+if [ "$DISK_TOTAL_BYTES" -gt 0 ]; then
+  MIN_FREE_BYTES=$(( DISK_TOTAL_BYTES / 20 ))
+else
+  MIN_FREE_BYTES=268435456
+fi
+[ "$MIN_FREE_BYTES" -ge 67108864 ] || MIN_FREE_BYTES=67108864
+MIN_FREE_BYTES="${REDPANDA_STORAGE_MIN_FREE_BYTES:-$MIN_FREE_BYTES}"
+log "volume ${DISK_TOTAL_BYTES} bytes -> storage_min_free_bytes=${MIN_FREE_BYTES}"
+
 {
   echo "redpanda:"
   echo "  data_directory: ${DATA_DIR}"
@@ -214,6 +229,8 @@ mkdir -p "$DATA_DIR" "$CONFIG_DIR"
   echo "default_topic_replications: 1"
   echo "minimum_topic_replications: 1"
   echo "auto_create_topics_enabled: ${REDPANDA_AUTO_CREATE_TOPICS:-true}"
+  echo "storage_min_free_bytes: ${MIN_FREE_BYTES}"
+  echo "disk_reservation_percent: ${REDPANDA_DISK_RESERVATION_PERCENT:-10}"
   echo "audit_enabled: false"
 } > "${CONFIG_DIR}/.bootstrap.yaml"
 
@@ -238,6 +255,10 @@ log "rendered ${CONFIG_DIR}/redpanda.yaml: kafka=${KAFKA_PORT} local=${LOCAL_KAF
     rpk cluster config set kafka_enable_authorization true "$@" >/dev/null 2>&1 || true
     rpk cluster config set admin_api_require_auth true "$@" >/dev/null 2>&1 || true
     rpk cluster config set superusers "[\"${ADMIN_USER}\"]" "$@" >/dev/null 2>&1 || true
+    # Both are cluster properties, so .bootstrap.yaml only ever applied them to a
+    # brand-new cluster; an existing one stays wedged in full-disk state without this.
+    rpk cluster config set storage_min_free_bytes "${MIN_FREE_BYTES}" "$@" >/dev/null 2>&1 || true
+    rpk cluster config set disk_reservation_percent "${REDPANDA_DISK_RESERVATION_PERCENT:-10}" "$@" >/dev/null 2>&1 || true
     log "security properties reconciled"
   else
     log "skipped security reconcile (admin API did not accept the configured credentials)"
