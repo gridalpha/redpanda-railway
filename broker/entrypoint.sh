@@ -54,6 +54,10 @@ ADMIN_PORT="${PORT:-9644}"
 SCHEMA_REGISTRY_PORT="${REDPANDA_SCHEMA_REGISTRY_PORT:-8081}"
 HTTP_PROXY_PORT="${REDPANDA_HTTP_PROXY_PORT:-8082}"
 RPC_PORT="${REDPANDA_RPC_PORT:-33145}"
+# Redpanda's own HTTP Proxy and Schema Registry clients are Kafka clients living
+# inside this container, and a service calling its own *.railway.internal name
+# fails at request time. They get a loopback listener of their own instead.
+LOCAL_KAFKA_PORT="${REDPANDA_LOCAL_KAFKA_PORT:-9093}"
 
 # The external Kafka listener only exists when a Railway TCP proxy is attached.
 # Both halves come from the container environment so a regenerated proxy port
@@ -147,6 +151,10 @@ mkdir -p "$DATA_DIR" "$CONFIG_DIR"
     echo "      port: ${EXT_LISTENER}"
     echo "      authentication_method: sasl"
   fi
+  echo "    - name: local"
+  echo "      address: 127.0.0.1"
+  echo "      port: ${LOCAL_KAFKA_PORT}"
+  echo "      authentication_method: sasl"
   echo "  advertised_kafka_api:"
   echo "    - name: internal"
   echo "      address: ${PRIVATE_HOST}"
@@ -156,6 +164,23 @@ mkdir -p "$DATA_DIR" "$CONFIG_DIR"
     echo "      address: ${EXT_ADVERTISED%%:*}"
     echo "      port: ${EXT_ADVERTISED##*:}"
   fi
+  echo "    - name: local"
+  echo "      address: 127.0.0.1"
+  echo "      port: ${LOCAL_KAFKA_PORT}"
+  echo "pandaproxy_client:"
+  echo "  brokers:"
+  echo "    - address: 127.0.0.1"
+  echo "      port: ${LOCAL_KAFKA_PORT}"
+  echo "  sasl_mechanism: ${SASL_MECHANISM}"
+  echo "  scram_username: ${ADMIN_USER}"
+  echo "  scram_password: ${ADMIN_PASSWORD}"
+  echo "schema_registry_client:"
+  echo "  brokers:"
+  echo "    - address: 127.0.0.1"
+  echo "      port: ${LOCAL_KAFKA_PORT}"
+  echo "  sasl_mechanism: ${SASL_MECHANISM}"
+  echo "  scram_username: ${ADMIN_USER}"
+  echo "  scram_password: ${ADMIN_PASSWORD}"
   echo "pandaproxy:"
   echo "  pandaproxy_api:"
   echo "    - name: internal"
@@ -190,8 +215,8 @@ mkdir -p "$DATA_DIR" "$CONFIG_DIR"
   echo "audit_enabled: false"
 } > "${CONFIG_DIR}/.bootstrap.yaml"
 
-log "rendered ${CONFIG_DIR}/redpanda.yaml (holds no credentials)"
-cat "${CONFIG_DIR}/redpanda.yaml"
+chmod 0640 "${CONFIG_DIR}/redpanda.yaml" "${CONFIG_DIR}/.bootstrap.yaml"
+log "rendered ${CONFIG_DIR}/redpanda.yaml: kafka=${KAFKA_PORT} local=${LOCAL_KAFKA_PORT} sr=${SCHEMA_REGISTRY_PORT} proxy=${HTTP_PROXY_PORT} admin=${ADMIN_PORT} advertised=${PRIVATE_HOST}"
 
 # ---------------------------------------------------------------- reconcile
 # .bootstrap.yaml is read only while the cluster has no controller log, so on an

@@ -35,6 +35,11 @@ environment variables alone:
   deployment.
 - The image runs as uid 101 and a Railway volume is mounted root-owned, so the
   entrypoint chowns it and drops back with `setpriv`.
+- The HTTP Proxy and Schema Registry are Kafka *clients* living inside the broker's
+  own container, and a service calling its own `*.railway.internal` name fails at
+  request time — the HTTP Proxy answers `503 broker_not_available` on a cluster that
+  is otherwise healthy. They are given a `local` Kafka listener on `127.0.0.1:9093`,
+  advertised as itself, which is unreachable from outside the container.
 
 **`console/`** — Console is configured entirely by environment variables. The only
 thing the entrypoint does is repair the cross-service references Railway renders as
